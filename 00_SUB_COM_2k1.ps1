@@ -3,6 +3,11 @@
 #デバックのための対応です。
 $hashtable = @{} 
 
+Write-Host -NoNewline "INCLUDE:"
+$script_name = $myInvocation.MyCommand.name
+Write-Host $script_name
+
+
 
 function DEV_OPN ($str){
 	$Buffers = $str.split("[, :]")
