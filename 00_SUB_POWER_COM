@@ -163,7 +163,7 @@ function QUE_CMD($str){
 			$time=0;
 			while($hashtable[$INDEX].stream.DataAvailable -ne $true){
 				start-sleep -m 500
-				write-host -NoNewline　"RCV待`r"
+				write-host -NoNewline　"Rx_wait`r"
 				$time++
 				if(10 -le $time ){ 
 					write-host "time out 5s`n"
@@ -192,13 +192,14 @@ function QUE_CMD($str){
 				return $byteBuffer
 
 			}
-			#return 1
+			return $ascii_data
+
 
 		 }
 		if( $hashtable[$INDEX].Dev -like "COM" ){
 			$hashtable[$INDEX].compt.WriteLine($COMAND) 
 			Start-Sleep -Milliseconds 50
-			if( $QorS[0] -like "S" ){ return }
+			if( $QorS[0] -like "S" ){ return $TRUE}
 			
 			$date = get-date		#現在時刻取得
 			$dateend = $date.Addseconds(+2) #現在時刻取得+2
@@ -210,69 +211,64 @@ function QUE_CMD($str){
 					$hashtable[$INDEX].brcv[       $hashtable[$INDEX].ircvLen     ] = $srdt
 					$hashtable[$INDEX].ircvLen++
 
-					if ($srdt -eq 0x0a){  #LF
-				        	$sr = [System.Text.Encoding]::ASCII.GetString($hashtable[$INDEX].brcv, 0, $hashtable[$INDEX].ircvLen)
+					if ($srdt -in @(0x0a ,0x0d)){  #CR LF
+				        	#$sr = [System.Text.Encoding]::ASCII.GetString($hashtable[$INDEX].brcv, 0, $hashtable[$INDEX].ircvLen)
 				        	#Write-Host $sr
-				        	$hashtable[$INDEX].brcv[  $hashtable[$INDEX].ircvLen  ] = 0x0a #LF
-				        	$hashtable[$INDEX].ircvLen++
-				        	#$compt.Write($brcv, 0, $ircvLen[$dev_sel_com])
-				        	$hashtable[$INDEX].ircvLen = 0
-						$dateend = $date
+				        	#$hashtable[$INDEX].brcv[  $hashtable[$INDEX].ircvLen  ] = 0x0a #LF
+				        	#$hashtable[$INDEX].ircvLen++
+				        	#$hashtable[$INDEX].ircvLen = 0
+						$date = get-date
+						$dateend = $date.AddMilliseconds(500)
 				      	}
-
-
-					if ($srdt -eq 0x0d){  #CR
-				        	$sr = [System.Text.Encoding]::ASCII.GetString($hashtable[$INDEX].brcv, 0, $hashtable[$INDEX].ircvLen)
-				        	#Write-Host $sr
-				        	$hashtable[$INDEX].brcv[  $hashtable[$INDEX].ircvLen  ] = 0x0a #LF
-				        	$hashtable[$INDEX].ircvLen++
-				        	#$compt.Write($brcv, 0, $ircvLen[$dev_sel_com])
-				        	$hashtable[$INDEX].ircvLen = 0
-						$dateend = $date
-				      	}
-
 
 				}
 			}
+			$sr = [System.Text.Encoding]::ASCII.GetString($hashtable[$INDEX].brcv, 0, $hashtable[$INDEX].ircvLen)
+			$date_end_byte= $hashtable[$INDEX].ircvLen
+			$hashtable[$INDEX].ircvLen = 0
 
+			if( $QorS[0] -like "S" ){ return $TRUE}
 			$hashtable[$INDEX].STR= $sr
 
 			if( $QorS[1] -like "C" ){
 				write-host $sr
-			}else{
+			}elseif( $QorS[1] -like "B" ){
+				#.bufferは\0が大量に含まれている。切り詰める
+				$byteBuffer = New-Object System.Byte[] $date_end_byte
+				for($flg=0 ;$flg -lt $date_end_byte ; $flg++){
+					$byteBuffer[ $flg ] = $hashtable[$INDEX].brcv[ $flg  ]
+				}
+				#バイナリデータを返す
+				return $byteBuffer
 
 			}
-
+			return $sr
 
 
 	    	}
 	}catch{
 		write-host "ERR"
-        	return -1
+        	return $FALSE
 	}	
 }
 
-
-
-
-
+#DIS AREA RUNNING COMAND!
 
 
 <#　EXLIST
+#DEV_OPN "NAME,SKT/COM,IPADDR/COMNo,PORT/BAUD"(' 'and','and':'is all delimiter)
+# 
+DEV_OPN "PWR SKT 192.168.1.2:5025"	#SOCETDEV OPEN
+DEV_OPN "PWR,SKT,192.168.1.2:5025"	#SOCETDEV OPEN(' 'and','and':'is all delimiter)
+DEV_OPN "RERAY COM COM9:9600"		#RS232DEV OPEN
+#      QUE_CMD "NAME,Query or Send ,VISA-CoMMAND" (' 'and','and':'is all delimiter)
+$NULL= QUE_CMD "PWR,S,VOLT 12"  #SEND_ONLY(NON RETURN VALUE)
+$STR = QUE_CMD "PWR,QC,*IDN?"	#RETUEN_STR & Write-host
+$STR = QUE_CMD "PWR,Q,*IDN?"	#RETUEN_STRING QNLY
+$BIN = QUE_CMD "PWR,QB,*IDN?"	#RETUEN_BYNARY ONLY
 
-QUE_CMD "PWR,S,VOLT 12" SEND_ONLY
-QUE_CMD "PWR,QC,*IDN?"  write-host
-QUE_CMD "PWR,Q,*IDN?"	NON write-host
 
-
-DEV_OPN "PWR SKT 192.168.1.2:5025"
-DEV_OPN "RERAY COM COM9:9600"
-SND_CMD "PWR,Q,VOLT 12"
-SND_CMD "RERAY,S,DO1 1"
-SND_CMD "RERAY,S,DO1 1"
-SND_CMD "RERAY,S,DO1 1"
-sleep 3
-DEV_CLS "PWR"
-DEV_CLS "RERAY"
-DEV_LIST
+DEV_CLS "PWR"		#CLOSE "NAME"device
+DEV_CLSA		#CLOSE ALL device
+DEV_LIST		#SHOW ALL device
 #>
