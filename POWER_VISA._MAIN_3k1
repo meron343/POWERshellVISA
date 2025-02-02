@@ -8,8 +8,8 @@ Write-Host "POWER_VISA 3k2 by#343"
 Write-Host "R7．1.23 "
 
 
-. ".\00_SUB_COM_2k1"
-#. ".\01_SUB_FUNC"
+. ".\SUBFUNC\00_SUB_POWER_COM_1k1"
+#. ".\SUBFUNC\01_SUB_FUNC"
 
 
 while($true) {
